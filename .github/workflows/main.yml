@@ -31,8 +31,8 @@ jobs:
           soft_fail: true
           download_external_modules: true
       
-      - name: Checkov report        
-        run: echo "Checkov report: ${{ steps.checkov.outputs.report }}"
+     # - name: Checkov report        
+        # run: echo "Checkov report: ${{ steps.checkov.outputs.report }}"
 
   terraformBuild:
     runs-on: ubuntu-latest
