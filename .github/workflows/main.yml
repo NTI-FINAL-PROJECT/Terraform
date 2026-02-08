@@ -18,10 +18,10 @@ jobs:
       
       - name: terraform gitleaks scan
         uses: gitleaks/gitleaks-action@v1
-        with:
-          report_format: summary
-          exit_code: 0 #اقفل دي لما تيجي ترن 
-          fail_on_secrets: false #اقفل دي لما تيجي ترن 
+        #with:
+          #report_format: summary
+          #exit_code: 0 #اقفل دي لما تيجي ترن 
+          #fail_on_secrets: false #اقفل دي لما تيجي ترن 
       
       - name: Run Checkov action
         id: checkov
