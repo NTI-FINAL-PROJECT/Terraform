@@ -1,0 +1,48 @@
+name: Terraform Validation
+
+on:
+    push:
+        branches:
+            - Dev
+
+    workflow_dispatch:
+
+jobs:
+    terraformValidation:
+        runs-on: ubuntu-latest
+        steps:
+            # 1. Checkout the repository to the runner
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            # 2. Setup Terraform
+            - name: Setup Terraform
+              uses: hashicorp/setup-terraform@v3
+
+            # 3. Check Formatting
+            # Fails if the code is not formatted correctly
+            - name: Terraform Format
+              run: terraform fmt -check
+
+            # 4. Terraform Init
+            - name: Terraform Init
+              run: terraform init
+              env:
+                  # Credentials are often needed here if you use a remote backend (like S3)
+                  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+            # 5. Validate Syntax
+            # Checks for syntax errors and internal consistency
+            - name: Terraform Validate
+              run: terraform validate
+
+            # 6. Dry Run (Plan)
+            # Checks if the changes can actually be applied to the cloud provider
+            # This captures logical errors (e.g., creating a resource that already exists)
+            - name: Terraform Plan
+              run: terraform plan -input=false
+              env:
+                  # You must add these secrets in GitHub Settings -> Secrets and Variables
+                  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
