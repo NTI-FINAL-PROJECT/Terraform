@@ -3,7 +3,6 @@ name: Scan Terraform Code
 on:
     pull_request:
         types: [opened, synchronize, reopened]
-    
     workflow_dispatch:
 
 jobs:
@@ -38,31 +37,31 @@ jobs:
                   soft_fail: true
                   quit: true
                   framework: terraform
-                  output_format: cli,junitxml
-                  output_file_path: checkov_report.xml
+                  output_format: cli,html
+                  output_file_path: checkov-report
 
             # Upload Checkov Report
             - name: Upload Checkov Report
               if: always()
               uses: actions/upload-artifact@v4
               with:
-                  name: Checkov-Report
-                  path: checkov_report.xml
+                  name: Checkov-HTML-Report
+                  path: checkov-report/results_html.html
 
             # Run tfsec
             - name: Run tfsec
               uses: aquasecurity/tfsec-action@v1.0.3
               with:
                   soft_fail: true
-                  additional_args: --format junit --out tfsec-results.xml
+                  additional_args: --format html --out tfsec-results.html
 
             # Upload tfsec Report
             - name: Upload tfsec Report
               if: always()
               uses: actions/upload-artifact@v4
               with:
-                  name: tfsec-Report
-                  path: tfsec-results.xml
+                  name: tfsec-HTML-Report
+                  path: tfsec-results.html
 
             # Terraform Plan (Safe for PRs)
             - name: Terraform Plan
