@@ -4,22 +4,23 @@
 # Checkov Professional HTML + PDF Security Report
 # =====================================================
 
+BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # Ensure reports directory exists
-mkdir -p reports
+mkdir -p "$BASE_DIR/../../reports"
 
 # Paths
-JSON_FILE="reports/checkov_report.json"
-HTML_REPORT="reports/checkov_report.html"
-PDF_REPORT="reports/checkov_report.pdf"
+# Check for JSON file (Checkov defaults to results_json.json)
+JSON_FILE=$(find "$BASE_DIR/../../reports" -name "*.json" | head -n 1)
+HTML_REPORT="$BASE_DIR/../../reports/checkov_report.html"
+PDF_REPORT="$BASE_DIR/../../reports/checkov_report.pdf"
 
 # -----------------------------------------------------
 # Safety check
 # -----------------------------------------------------
-if [ ! -f "$JSON_FILE" ]; then
-  echo "❌ JSON file not found: $JSON_FILE"
-  # If the file doesn't exist, we can't generate a report.
-  # However, if Checkov failed (exit code 1), it might still have produced output.
-  # Let's check if we can proceed or just exit.
+if [ -z "$JSON_FILE" ]; then
+  echo "❌ JSON file not found in $BASE_DIR/../../reports/"
+  ls -R "$BASE_DIR/../../reports/"
   exit 1
 fi
 

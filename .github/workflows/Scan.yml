@@ -47,7 +47,7 @@ jobs:
                   quit: true
                   framework: terraform
                   output_format: json
-                  output_file_path: reports/checkov_report.json
+                  output_file_path: reports
 
             # Generate Custom Report
             - name: Generate Custom Report
