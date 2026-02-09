@@ -2,6 +2,8 @@ name: Scan Terraform Code
 
 on:
     pull_request:
+        branches:
+            - Dev
         types: [opened, synchronize, reopened]
     workflow_dispatch:
 
