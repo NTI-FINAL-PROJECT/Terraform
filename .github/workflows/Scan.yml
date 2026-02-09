@@ -1,0 +1,69 @@
+name: Scan Terraform Code
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened]
+    
+    workflow_dispatch:
+
+jobs:
+    ScanTerraform:
+        runs-on: ubuntu-latest
+        steps:
+            # Pull code
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            # Configure AWS Credentials
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            # Setup Terraform
+            - name: Setup Terraform
+              uses: hashicorp/setup-terraform@v2
+
+            # Initialize Terraform
+            - name: Terraform Init
+              run: terraform init
+
+            # Run Checkov
+            - name: Run Checkov
+              uses: bridgecrewio/checkov-action@master
+              with:
+                  directory: .
+                  soft_fail: true
+                  quit: true
+                  framework: terraform
+                  output_format: cli,junitxml
+                  output_file_path: checkov_report.xml
+
+            # Upload Checkov Report
+            - name: Upload Checkov Report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: Checkov-Report
+                  path: checkov_report.xml
+
+            # Run tfsec
+            - name: Run tfsec
+              uses: aquasecurity/tfsec-action@v1.0.3
+              with:
+                  soft_fail: true
+                  additional_args: --format junit --out tfsec-results.xml
+
+            # Upload tfsec Report
+            - name: Upload tfsec Report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: tfsec-Report
+                  path: tfsec-results.xml
+
+            # Terraform Plan (Safe for PRs)
+            - name: Terraform Plan
+              run: terraform plan

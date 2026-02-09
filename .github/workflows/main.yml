@@ -11,11 +11,6 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: terraform security scan 
-        uses: aquasecurity/tfsec-action@v1.0.0
-        with:
-          soft_fail: true #اقفل دي لما تيجي ترن 
-      
       - name: terraform gitleaks scan
         uses: gitleaks/gitleaks-action@v1
         #with:
@@ -48,7 +43,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-central-1
+          aws-region: us-east-1
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
