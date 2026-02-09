@@ -1,0 +1,343 @@
+#!/bin/bash
+
+# =====================================================
+# Checkov Professional HTML + PDF Security Report
+# =====================================================
+
+# Ensure reports directory exists
+mkdir -p reports
+
+# Paths
+JSON_FILE="reports/checkov_report.json"
+HTML_REPORT="reports/checkov_report.html"
+PDF_REPORT="reports/checkov_report.pdf"
+
+# -----------------------------------------------------
+# Safety check
+# -----------------------------------------------------
+if [ ! -f "$JSON_FILE" ]; then
+  echo "❌ JSON file not found: $JSON_FILE"
+  # If the file doesn't exist, we can't generate a report.
+  # However, if Checkov failed (exit code 1), it might still have produced output.
+  # Let's check if we can proceed or just exit.
+  exit 1
+fi
+
+# Check if JSON is valid/not empty
+if [ ! -s "$JSON_FILE" ]; then
+  echo "❌ JSON file is empty!"
+  exit 1
+fi
+
+# -----------------------------------------------------
+# Summary
+# -----------------------------------------------------
+# Use jq to extract summary. Handle cases where checkov output might be an array (if multiple files/modules)
+# If it's an array, we sum up the values. If it's a single object, we take it directly.
+PASSED_COUNT=$(jq 'if type=="array" then [.[].summary.passed] | add else .summary.passed end' "$JSON_FILE")
+FAILED_COUNT=$(jq 'if type=="array" then [.[].summary.failed] | add else .summary.failed end' "$JSON_FILE")
+GENERATED_AT=$(date "+%Y-%m-%d %H:%M:%S")
+
+# -----------------------------------------------------
+# Failed rows with Severity
+# -----------------------------------------------------
+# We need to flatten the results if it's an array, then iterate over results.failed_checks
+FAILED_ROWS=$(jq -r '
+def severity:
+  if .check_id | startswith("CKV2") then "Critical"
+  elif .check_id | startswith("CKV_SECRET") then "Critical"
+  else "High"
+  end;
+
+def severity_class:
+  if .check_id | startswith("CKV2") then "badge-critical"
+  elif .check_id | startswith("CKV_SECRET") then "badge-critical"
+  else "badge-high"
+  end;
+
+# Handle both array (multi-folder scan) and object (single folder scan)
+(if type=="array" then .[].results.failed_checks else .results.failed_checks end) | .[]? |
+"<tr>
+  <td>" + (.resource // "N/A") + "</td>
+  <td>" + .check_name + "</td>
+  <td><span class=\"badge " + severity_class + "\">" + severity + "</span></td>
+  <td><span class=\"badge badge-fail\">FAILED</span></td>
+  <td><a href=\"" + (.guideline // "#") + "\" target=\"_blank\">Remediation</a></td>
+</tr>"
+' "$JSON_FILE")
+
+# -----------------------------------------------------
+# HTML + CSS
+# -----------------------------------------------------
+cat <<EOF > "$HTML_REPORT"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Checkov Terraform Security Report</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+  font-family: Inter, system-ui, sans-serif;
+  background: #f4f6f8;
+  margin: 0;
+  color: #1f2937;
+}
+
+/* ===== Header ===== */
+.header {
+  background: linear-gradient(135deg, #111827, #1f2937);
+  color: white;
+  padding: 24px 40px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.header p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: #d1d5db;
+}
+
+/* ===== Layout ===== */
+.container {
+  max-width: 1200px;
+  margin: auto;
+  padding: 40px;
+}
+
+/* ===== Cards ===== */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+}
+
+.card h2 {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.card .value {
+  font-size: 34px;
+  font-weight: bold;
+}
+
+.success { color: #16a34a; }
+.danger  { color: #dc2626; }
+
+/* ===== Table ===== */
+table {
+  width: 100%;
+  background: white;
+  border-collapse: collapse;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+}
+
+thead {
+  background: #111827;
+  color: white;
+}
+
+th, td {
+  padding: 14px 16px;
+  text-align: left;
+}
+
+tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+tbody tr:hover {
+  background: #f9fafb;
+}
+
+/* ===== Badges ===== */
+.badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-fail {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.badge-critical {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-high {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+/* ===== Success ===== */
+.success-box {
+  background: #ecfdf5;
+  border: 1px solid #10b981;
+  color: #065f46;
+  padding: 22px;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* ===== Footer ===== */
+.footer {
+  background: #111827;
+  color: #9ca3af;
+  text-align: center;
+  padding: 18px;
+  font-size: 13px;
+  margin-top: 40px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>🔐 Terraform Security Assessment</h1>
+  <p>Generated by Checkov • $GENERATED_AT</p>
+</div>
+
+<div class="container">
+
+<!-- Summary -->
+<div class="cards">
+  <div class="card">
+    <h2>Passed Checks</h2>
+    <div class="value success">$PASSED_COUNT</div>
+  </div>
+
+  <div class="card">
+    <h2>Failed Checks</h2>
+    <div class="value danger">$FAILED_COUNT</div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="cards">
+  <div class="card" style="height: 300px;"><canvas id="donutChart"></canvas></div>
+  <div class="card" style="height: 300px;"><canvas id="barChart"></canvas></div>
+</div>
+EOF
+
+# -----------------------------------------------------
+# Conditional content
+# -----------------------------------------------------
+if [ "$FAILED_COUNT" -gt 0 ]; then
+cat <<EOF >> "$HTML_REPORT"
+<table>
+<thead>
+<tr>
+  <th>Resource</th>
+  <th>Vulnerability</th>
+  <th>Severity</th>
+  <th>Status</th>
+  <th>Remediation</th>
+</tr>
+</thead>
+<tbody>
+$FAILED_ROWS
+</tbody>
+</table>
+EOF
+else
+cat <<EOF >> "$HTML_REPORT"
+<div class="success-box">
+✅ All security checks passed successfully.  
+Infrastructure complies with security best practices.
+</div>
+EOF
+fi
+
+# -----------------------------------------------------
+# Charts JS + Footer
+# -----------------------------------------------------
+cat <<EOF >> "$HTML_REPORT"
+<script>
+const passed = $PASSED_COUNT;
+const failed = $FAILED_COUNT;
+
+// Prevent chart from growing infinitely
+const chartOptions = {
+  maintainAspectRatio: false,
+  responsive: true,
+  plugins: { legend: { position: 'bottom' } }
+};
+
+new Chart(document.getElementById('donutChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Passed', 'Failed'],
+    datasets: [{
+      data: [passed, failed],
+      backgroundColor: ['#22c55e', '#ef4444']
+    }]
+  },
+  options: chartOptions
+});
+
+new Chart(document.getElementById('barChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Passed', 'Failed'],
+    datasets: [{
+      data: [passed, failed],
+      backgroundColor: ['#22c55e', '#ef4444']
+    }]
+  },
+  options: { 
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } } 
+  }
+});
+</script>
+
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  © 2026 • Security Report generated via Checkov • Terraform IaC Assessment
+</div>
+
+</body>
+</html>
+EOF
+
+echo "✅ HTML report generated: $HTML_REPORT"
+
+# -----------------------------------------------------
+# PDF Export
+# -----------------------------------------------------
+if command -v wkhtmltopdf &> /dev/null; then
+    wkhtmltopdf "$HTML_REPORT" "$PDF_REPORT" >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+      echo "📄 PDF report generated: $PDF_REPORT"
+    else
+      echo "⚠️ PDF generation failed"
+    fi
+else
+    echo "⚠️ wkhtmltopdf not found, skipping PDF generation."
+fi

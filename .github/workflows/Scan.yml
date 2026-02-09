@@ -31,6 +31,13 @@ jobs:
             - name: Terraform Init
               run: terraform init
 
+            # Install Dependencies for Report Generation
+            - name: Install Report Dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y jq wkhtmltopdf
+                  mkdir -p reports
+
             # Run Checkov
             - name: Run Checkov
               uses: bridgecrewio/checkov-action@master
@@ -39,31 +46,30 @@ jobs:
                   soft_fail: true
                   quit: true
                   framework: terraform
-                  output_format: cli,junitxml
-                  output_file_path: checkov_report.xml
+                  output_format: json
+                  output_file_path: reports/checkov_report.json
 
-            # Upload Checkov Report
-            - name: Upload Checkov Report
+            # Generate Custom Report
+            - name: Generate Custom Report
               if: always()
-              uses: actions/upload-artifact@v4
-              with:
-                  name: Checkov-Report
-                  path: checkov_report.xml
+              run: |
+                  chmod +x .github/scripts/generate-report.sh
+                  ./.github/scripts/generate-report.sh
 
             # Run tfsec
             - name: Run tfsec
               uses: aquasecurity/tfsec-action@v1.0.3
               with:
                   soft_fail: true
-                  additional_args: --format html --out tfsec-results.html
+                  additional_args: --format html --out reports/tfsec-results.html
 
-            # Upload tfsec Report
-            - name: Upload tfsec Report
+            # Upload Security Reports
+            - name: Upload Security Reports
               if: always()
               uses: actions/upload-artifact@v4
               with:
-                  name: tfsec-HTML-Report
-                  path: tfsec-results.html
+                  name: Security-Reports
+                  path: reports/
 
             # Terraform Plan (Safe for PRs)
             - name: Terraform Plan
